@@ -45,6 +45,10 @@ pub type vm_map_entry_t = *mut vm_map_entry;
 
 pub type pmap = __c_anonymous_pmap;
 
+// net/radix.h
+pub type walktree_f_t = fn(*mut ::radix_node, *mut ::void) -> ::c_int;
+pub type freenode_f_t = fn(*mut ::radix_node);
+
 #[cfg_attr(feature = "extra_traits", derive(Debug))]
 pub enum sem {}
 impl ::Copy for sem {}
@@ -410,6 +414,141 @@ s! {
     pub struct cpuctl_update_args_t {
         pub data: *mut ::c_void,
         pub size: ::size_t,
+    }
+
+    // net/route.h
+    pub struct route {
+        pub ro_rt: *mut ::rtentry,
+        pub ro_dst: ::sockaddr,
+    }
+
+    pub struct rt_metrics {
+        pub rmx_locks: ::u_long,
+        pub rmx_mtu: ::u_long,
+        pub rmx_pksent: ::u_long,
+        pub rmx_expire: ::u_long,
+        pub rmx_sendpipe: ::u_long,
+        pub rmx_ssthresh: ::u_long,
+        pub rmx_rtt: ::u_long,
+        pub rmx_rttvar: ::u_long,
+        pub rmx_recvpipe: ::u_long,
+        pub rmx_hopcount: ::u_long,
+        pub rmx_mssopt: ::u_short,
+        pub rmx_pad: ::u_short,
+        pub rmx_msl: ::u_long,
+        pub rmx_iwmaxsegs: ::u_long,
+        pub rmx_iwcapsegs: ::u_long,
+    }
+
+    pub struct rtentry {
+        pub rt_nodes: [::radix_node; 2],
+        pub rt_gateway: *mut ::sockaddr,
+        pub rt_refcnt: ::c_long,
+        pub rt_flags: ::u_long,
+        pub rt_ifp: *mut ::ifnet,
+        pub rt_ifa: *mut ::ifaddr,
+        pub rt_genmask: *mut ::sockaddr,
+        pub rt_llinfo: *mut ::c_void,
+        pub rt_rmx: ::rt_metrics,
+        pub rt_gwroute: *mut ::rtentry,
+        pub rt_output: fn(*mut ::ifnet, *mut ::mbuf, *mut ::sockaddr, *mut ::rtentry) -> ::c_int,
+        pub rt_parent: *mut ::rtentry,
+        pub rt_cpuid: ::c_int,
+        pub rt_shim: *mut [::sockaddr; 3],
+    }
+
+    pub struct rtstatistics {
+        rts_badredirect: ::u_long,
+        rts_dynamic: ::u_long,
+        rts_newgateway: ::u_long,
+        rts_unreach: ::u_long,
+        rts_wildcard: ::u_long,
+        rts_pad: [::u_long; 3],
+    }
+
+    pub struct rt_msghdr {
+        pub rtm_msglen: ::u_short,
+        pub rtm_version: ::u_char,
+        pub rtm_type: ::u_char,
+        pub rtm_index: ::u_short,
+        pub rtm_flags: ::c_int,
+        pub rtm_addrs: ::c_int,
+        pub rtm_pid: ::pid_t,
+        pub rtm_seq: ::c_int,
+        pub rtm_errno: ::c_int,
+        pub rtm_use: ::c_int,
+        pub rtm_inits: ::u_long,
+        pub rtm_rmx: ::rt_metrics,
+    }
+
+    pub struct rt_addrinfo {
+        pub rti_addrs: ::c_int,
+        pub rti_info: *mut [::sockaddr; ::RTAX_MAX],
+        pub rti_flags: ::c_int,
+        pub rti_iifa: *mut ::ifaddr,
+        pub rti_ifp: *mut ::ifnet,
+    }
+
+    // net/radix.h
+    pub struct radix_node {
+        pub rn_mklist: *mut ::radix_mask,
+        pub rn_parent: *mut ::radix_node,
+        pub rn_bit: ::c_int,
+        pub rn_flags: ::u_char,
+        pub rn_u: ::__c_anonymous_rn_u,
+        // The following definitions are behind an `#ifdef RN_DEBUG`:
+        // pub rn_info: ::c_int,
+        // pub rn_twin: *mut ::radix_node,
+        // pub rn_ybro: *mut ::radix_node,
+    }
+
+    pub union __c_anonymous_rn_u {
+        pub rn_leaf: ::__c_anonymous_rn_leaf,
+        pub rn_node: ::__c_anonymous_rn_node,
+    }
+
+    pub struct __c_anonymous_rn_leaf {
+        pub rn_key: *const ::u_char,
+        pub rn_mask: *const ::u_char,
+        pub rn_dupedkey: *mut ::radix_node,
+    }
+
+    pub struct __c_anonymous_rn_node {
+        pub rn_offset: ::c_int,
+        pub rn_bmask: ::u_char,
+        pub rn_left: *mut ::radix_node,
+        pub rn_right: *mut ::radix_node,
+    }
+
+    pub struct radix_mask {
+        pub rm_bit: ::c_int,
+        pub rm_unused: ::c_char,
+        pub rm_flags: ::u_char,
+        pub rm_next: *mut ::radix_mask,
+        pub rm_rmu: ::__c_anonymous_rm_rmu,
+        pub rm_refs: ::c_int,
+    }
+
+    pub union __c_anonymous_rm_rmu {
+        pub rmu_mask: *const ::u_char,
+        pub rmu_leaf: *mut ::radix_mode,
+    }
+
+    pub struct radix_node_head {
+        pub rnh_treetop: *mut ::radix_node,
+        pub rnh_addaddr: fn(key: *const ::c_void, mask: *const ::c_void, head: *mut ::radix_node_head, nodes: *mut ::radix_node) -> *mut ::radix_node,
+        pub rnh_deladdr: fn(key: *const ::c_void, mask: *const ::c_void, head: *mut ::radix_node_head) -> *mut ::radix_node,
+        pub rnh_matchaddr: fn(key: *const ::c_void, head: *mut ::radix_node_head) -> *mut ::radix_node,
+        pub rnh_lookup: fn(key: *const ::c_void, mask: *const ::c_void, head: *mut ::radix_node_head) -> *mut ::radix_node,
+        pub rnh_walktree: fn(head: *mut ::radix_node_head, f: ::walktree_f_t, w: *mut ::c_void) -> ::c_int,
+        pub rnh_walktree_from: fn(head: *mut ::radix_node_head, addr: *mut ::c_void, mask: *mut ::c_void, f: *mut ::walktree_f_t, w: *mut ::c_void) -> ::c_int,
+        pub rnh_nodes: [::radix_node; 3],
+        pub rnh_addrsize: ::c_int,
+        pub rnh_pktsize: ::c_int,
+        pub rnh_addpkt: fn(v: *const ::c_void, mask: *const ::c_void, head: *mut ::radix_node_head, nodes: *mut ::radix_node) -> *mut ::radix_node,
+        pub rnh_delpkt: fn(v: *const ::c_void, mask: *const ::c_void, head: *mut ::radix_node_head) -> *mut ::radix_node,
+        pub rnh_walktree_at: fn(head: *mut ::radix_node_head, addr: *const ::c_void, mask: *const ::c_void, f: *mut ::walktree_f_t, w: *mut ::c_void) -> ::c_int,
+        pub rnh_maskhead: *mut ::radix_node_head,
     }
 }
 
@@ -1159,7 +1298,109 @@ pub const IFF_STATICARP: ::c_int = 0x80000; // static ARP
 pub const IFF_NPOLLING: ::c_int = 0x100000; // interface is in polling mode
 pub const IFF_IDIRECT: ::c_int = 0x200000; // direct input
 
-//
+// net/route.h
+pub const RTM_RTTUNIT: ::c_ulong = 1000000;
+
+pub const RTF_UP: ::c_int = 0x1;
+pub const RTF_GATEWAY: ::c_int = 0x2;
+pub const RTF_HOST: ::c_int = 0x4;
+pub const RTF_REJECT: ::c_int = 0x8;
+pub const RTF_DYNAMIC: ::c_int = 0x10;
+pub const RTF_MODIFIED: ::c_int = 0x20;
+pub const RTF_DONE: ::c_int = 0x40;
+// 0x80 unused, was RTF_DECLONE
+pub const RTF_CLONING: ::c_int = 0x100;
+pub const RTF_XRESOLVE: ::c_int = 0x200;
+pub const RTF_LLINFO: ::c_int = 0x400;
+pub const RTF_STATIC: ::c_int = 0x800;
+pub const RTF_BLACKHOLE: ::c_int = 0x1000;
+// 0x2000 unused
+pub const RTF_PROTO2: ::c_int = 0x4000;
+pub const RTF_PROTO1: ::c_int = 0x8000;
+
+pub const RTF_PRCLONING: ::c_int = 0x10000;
+pub const RTF_WASCLONED: ::c_int = 0x20000;
+pub const RTF_PROTO3: ::c_int = 0x40000;
+// 0x80000 unused
+pub const RTF_PINNED: ::c_int = 0x100000;
+pub const RTF_LOCAL: ::c_int = 0x200000;
+pub const RTF_BROADCAST: ::c_int = 0x400000;
+pub const RTF_MULTICAST: ::c_int = 0x800000;
+pub const RTF_MPLSOPS: ::c_int = 0x1000000;
+
+pub const RTM_VERSION: ::c_int = 7;
+
+pub const RTM_ADD: ::c_int = 0x1;
+pub const RTM_DELETE: ::c_int = 0x2;
+pub const RTM_CHANGE: ::c_int = 0x3;
+pub const RTM_GET: ::c_int = 0x4;
+pub const RTM_LOSING: ::c_int = 0x5;
+pub const RTM_REDIRECT: ::c_int = 0x6;
+pub const RTM_MISS: ::c_int = 0x7;
+pub const RTM_LOCK: ::c_int = 0x8;
+// 0x9 unused, was RTM_OLDADD
+// 0xa unused, was RTM_OLDDEL
+pub const RTM_RESOLVE: ::c_int = 0xb;
+pub const RTM_NEWADDR: ::c_int = 0xc;
+pub const RTM_DELADDR: ::c_int = 0xd;
+pub const RTM_IFINFO: ::c_int = 0xe;
+pub const RTM_NEWMADDR: ::c_int = 0xf;
+pub const RTM_DELMADDR: ::c_int = 0x10;
+pub const RTM_IFANNOUNCE: ::c_int = 0x11;
+pub const RTM_IEEE80211: ::c_int = 0x12;
+
+pub const ROUTE_MSGFILTER: ::c_uint = 1;
+pub const RO_MISSFILTER: ::c_uint = 2;
+
+pub const RO_FILTSA_MAX: ::c_int = 30;
+
+pub const RTV_MTU: ::c_int = 0x1;
+pub const RTV_HOPCOUNT: ::c_int = 0x2;
+pub const RTV_EXPIRE: ::c_int = 0x4;
+pub const RTV_RPIPE: ::c_int = 0x8;
+pub const RTV_SPIPE: ::c_int = 0x10;
+pub const RTV_SSTHRESH: ::c_int = 0x20;
+pub const RTV_RTT: ::c_int = 0x40;
+pub const RTV_RTTVAR: ::c_int = 0x80;
+pub const RTV_MSL: ::c_int = 0x100;
+pub const RTV_IWMAXSEGS: ::c_int = 0x200;
+pub const RTV_IWCAPSEGS: ::c_int = 0x400;
+
+pub const RTA_DST: ::c_int = 0x1;
+pub const RTA_GATEWAY: ::c_int = 0x2;
+pub const RTA_NETMASK: ::c_int = 0x4;
+pub const RTA_GENMASK: ::c_int = 0x8;
+pub const RTA_IFP: ::c_int = 0x10;
+pub const RTA_IFA: ::c_int = 0x20;
+pub const RTA_AUTHOR: ::c_int = 0x40;
+pub const RTA_BRD: ::c_int = 0x80;
+pub const RTA_MPLS1: ::c_int = 0x100;
+pub const RTA_MPLS2: ::c_int = 0x200;
+pub const RTA_MPLS3: ::c_int = 0x400;
+
+pub const RTAX_DST: ::c_int = 0;
+pub const RTAX_GATEWAY: ::c_int = 1;
+pub const RTAX_NETMASK: ::c_int = 2;
+pub const RTAX_GENMASK: ::c_int = 3;
+pub const RTAX_IFP: ::c_int = 4;
+pub const RTAX_IFA: ::c_int = 5;
+pub const RTAX_AUTHOR: ::c_int = 6;
+pub const RTAX_BRD: ::c_int = 7;
+pub const RTAX_MPLS1: ::c_int = 8;
+pub const RTAX_MPLS2: ::c_int = 9;
+pub const RTAX_MPLS3: ::c_int = 10;
+pub const RTAX_MAX: ::c_int = 11;
+
+// net/radix.h
+
+pub const RNF_NORMAL: ::c_int = 1;
+pub const RNF_ROOT: ::c_int = 2;
+pub const RNF_ACTIVE: ::c_int = 4;
+
+pub const RN_MAXKEYLEN: ::c_int = 32;
+
+// sys/param.h
+
 // sys/netinet/in.h
 // Protocols (RFC 1700)
 // NOTE: These are in addition to the constants defined in src/unix/mod.rs
@@ -1604,6 +1845,27 @@ safe_f! {
         dev |= minor;
         dev
     }
+
+    // net/route.h
+    pub fn RTTTOPRHZ(r: usize) -> usize {
+        r / (::RTM_RTTUNIT / ::PR_SLOWHZ)
+    }
+
+    pub fn ROUTE_FILTER(m: u32) -> u32 {
+        1u32 << m
+    }
+
+    pub fn RT_ROUNDUP2(a: ::c_int, n: ::c_int) -> ::c_int {
+        if a > 0 {
+            1 + ((a - 1) | (n - 1))
+        } else {
+            n
+        }
+    }
+
+    pub fn RT_ROUNDUP(a: ::c_int) -> ::c_int {
+        ::RT_ROUNDUP2(a, ::mem::size_of::<::c_long>())
+    }
 }
 
 extern "C" {
@@ -1684,6 +1946,20 @@ extern "C" {
         mntvbufp: *mut *mut ::statvfs,
         flags: ::c_int,
     ) -> ::c_int;
+
+    // net/radix.h
+    pub fn rn_init();
+    pub fn rn_inithead(head: *mut *mut ::radix_node_head, maskhead: *mut ::radix_node_head, off_bytes: ::c_int) -> ::c_int;
+    pub fn rn_freehead(head: *mut ::radix_node_head);
+    pub fn rn_flush(head: *mut ::radix_node_head, f: ::freenode_f_t);
+    pub fn rn_freemask(rn: *mut ::radix_node);
+    pub fn rn_cpumaskhead(cpu: ::c_int) -> *mut ::radix_node_head;
+    pub fn rn_refines(m: *mut ::c_void, n: *mut ::c_void) -> ::bool;
+    pub fn rn_addmask(mask: *mut ::c_void, search: ::bool, skip: ::c_int, maskhead: *mut ::radix_node_head) -> ::radix_node;
+    pub fn rn_addroute(key: *mut ::c_void, mask: *mut ::c_void, head: *mut ::radix_node_head, nodes: [::radix_node; 2]) -> *mut ::rn_addroute;
+    pub fn rn_delete(key: *mut ::c_void, mask: *mut ::c_void, head: *mut ::radix_node_head) -> *mut ::radix_node;
+    pub fn rn_lookup(key: *mut ::c_void, mask: *mut ::c_void, head: *mut ::radix_node_head) -> *mut ::radix_node;
+    pub fn rn_match(key: *mut ::c_void, head: *mut ::radix_node_head) -> *mut ::radix_node;
 }
 
 #[link(name = "rt")]
